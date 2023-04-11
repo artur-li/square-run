@@ -5,6 +5,32 @@ pygame.init()
 screen = pygame.display.set_mode((800,400))
 clock = pygame.time.Clock()
 
+# score
+score = 0
+font = pygame.font.Font(None, 40)
+def update_score():
+    score_surf = font.render("SCORE: " + str(score), False, "grey", "black")
+    score_rect = score_surf.get_rect(center=(400,60))
+    screen.blit(score_surf,score_rect)
+class Scorechecker(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((80,80))
+        self.rect = self.image.get_rect(bottomleft=(800,100))
+    def movement(self):
+        self.rect.centerx -= 5
+    def kill(self):
+        if self.rect.centerx <= 0:
+            pygame.sprite.Sprite.kill(self)
+    def score_plus_1(self):
+        global score
+        if self.rect.centerx == 150:
+            score += 1
+    def update(self):
+        self.score_plus_1()
+        self.movement()
+        self.kill()
+
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
@@ -24,8 +50,16 @@ class Player(pygame.sprite.Sprite):
                 self.start_jump_loop = False
                 self.rect.midbottom = (200,300)
                 self.jump_speed = 10
+    def collision(self):
+        global game_state, over_state
+        collided = pygame.sprite.spritecollide(player, obstacle_group, False)
+        for i in collided:
+            if i != None:
+                game_state = False
+                over_state = True
     def update(self):
         self.jumping()
+        self.collision()
 player_group = pygame.sprite.Group()
 player = Player()
 player_group.add(player)
@@ -69,22 +103,28 @@ def spawn_obstacle():
     if timer % 180 == 0:
         if random.choice([1,2]) == 1:
             obstacle = Obstacle_a()
-            obstacle_group.add(obstacle)
+            score_check = Scorechecker()
+            obstacle_group.add(obstacle, score_check)
         else:
             obstacle = Obstacle_b()
-            obstacle_group.add(obstacle)
+            score_check = Scorechecker()
+            obstacle_group.add(obstacle, score_check)
 obstacle_group = pygame.sprite.Group()
 
-# game loop
-while True:
+# start_game state
+def start_game():
+    global game_state
+    global start_state
+    play_surf = font.render("PLAY", False, "Blue", "black")
+    play_rect = play_surf.get_rect(center=(400,200))
+    screen.blit(play_surf,play_rect)
+    mouse_pos = pygame.mouse.get_pos()
+    if play_rect.collidepoint(mouse_pos) and pygame.mouse.get_pressed() != (False, False, False):
+        start_state = False
+        game_state = True
 
-    # close window when 'x' presed
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-
-    # draw to screen
+# game_active state
+def game():
     # background
     screen.fill("black")
     pygame.draw.line(screen,"white",(0,300),(800,300),1)
@@ -95,7 +135,52 @@ while True:
     spawn_obstacle()
     obstacle_group.draw(screen)
     obstacle_group.update()
-        
+    # score 
+    update_score()
+
+# game_over state
+def game_over():
+    global game_state, timer, interval, score
+    screen.fill("black")
+    score_surf = font.render("FINAL SCORE: " + str(score), False, "grey", "black")
+    score_rect = score_surf.get_rect(center=(400,170))
+    screen.blit(score_surf,score_rect)
+    play_surf = font.render("PLAY AGAIN", False, "Blue", "black")
+    play_rect = play_surf.get_rect(center=(400,230))
+    screen.blit(play_surf,play_rect)
+    mouse_pos = pygame.mouse.get_pos()
+    if play_rect.collidepoint(mouse_pos) and pygame.mouse.get_pressed() != (False, False, False):
+        timer = 0
+        interval = 1
+        game_state = True
+        score = 0
+        obstacle_group.empty()
+
+# state variables
+start_state = True
+game_state = False
+over_state = False
+
+
+
+# game loop
+while True:
+
+    # close window when 'x' presed
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+
+    if start_state:
+        start_game()
+    
+    elif game_state:
+        game()
+    
+    elif over_state:
+        game_over()
+    
     # update screen 60fps
     pygame.display.update()
     clock.tick(60)
